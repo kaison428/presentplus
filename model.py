@@ -1,7 +1,6 @@
 import os
 import openai
 
-
 # parser
 import PyPDF2
 

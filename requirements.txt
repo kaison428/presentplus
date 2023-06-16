@@ -2,3 +2,6 @@ streamlit
 streamlit-chat
 streamlit-extras
 PyPDF2
+openai
+langchain
+dotenv
