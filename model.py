@@ -14,11 +14,6 @@ from langchain.docstore.document import Document
 
 from langchain.chains.summarize import load_summarize_chain
 
-from dotenv import load_dotenv, find_dotenv
-_ = load_dotenv(find_dotenv(), override=True) # read local .env file
-
-openai.api_key  = os.environ['OPENAI_API_KEY']
-
 def get_text_from_pdf(fileobj):
 
     #create reader variable that will read the pdffileobj

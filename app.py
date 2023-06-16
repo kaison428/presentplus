@@ -5,6 +5,10 @@ from streamlit_extras.add_vertical_space import add_vertical_space
 
 from model import *
 
+# Set API Key
+import os
+os.environ['OPENAI_API_KEY'] = st.secrets['OPENAI_API_KEY']
+
 ################################################################
 PROMPT_TEMPLATE = '''
     You are a professional in marketing, specializing in market research and technology development. \
