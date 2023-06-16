@@ -3,8 +3,6 @@ from streamlit_chat import message
 from streamlit_extras.colored_header import colored_header
 from streamlit_extras.add_vertical_space import add_vertical_space
 
-import PyPDF2
-
 from model import *
 
 ################################################################
@@ -20,11 +18,11 @@ PROMPT_TEMPLATE = '''
 
 '''
 
-st.set_page_config(page_title="PresentPlus - An LLM-powered Presentation Mentor", page_icon="⭐")
+st.set_page_config(page_title="PresentPlus - An LLM-powered Presentation Mentor", page_icon=":star:")
 
 # Sidebar contents
 with st.sidebar:
-    st.title('👁️‍🗨️ PresentPlus')
+    st.title(':eye: PresentPlus')
     st.markdown('''
     ## About
     This app is an LLM-powered presentation analyzer built using:
@@ -34,7 +32,7 @@ with st.sidebar:
     ''')
 
     add_vertical_space(5)
-    st.write('Made by Kaison from HYPE AI')
+    st.write('Made by Kaison from HYPE AI :book:')
 
 # Layout of input/response containers
 input_container = st.container()
