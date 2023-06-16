@@ -4,4 +4,3 @@ streamlit-extras
 PyPDF2
 openai
 langchain
-dotenv
