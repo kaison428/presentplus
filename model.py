@@ -1,9 +1,6 @@
 import os
 import openai
-import sys
-import utils
 
-import json
 
 # parser
 import PyPDF2
