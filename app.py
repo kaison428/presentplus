@@ -9,19 +9,6 @@ from model import *
 import os
 os.environ['OPENAI_API_KEY'] = st.secrets['OPENAI_API_KEY']
 
-################################################################
-PROMPT_TEMPLATE = '''
-    You are a professional in marketing, specializing in market research and technology development. \
-    You are a judge of an undergraduate marketing presentation competition. \
-    
-    Write a concise summary of the following:\
-    
-    {text}
-
-   The summary should focus on the technical content and technology aspect of presentation.\
-
-'''
-
 st.set_page_config(page_title="PresentPlus - An LLM-powered Presentation Mentor", page_icon=":star:")
 
 # Sidebar contents
@@ -40,7 +27,7 @@ with st.sidebar:
 
 # Layout of input/response containers
 input_container = st.container()
-# context_container = st.container()
+context_container = st.container()
 colored_header(label='', description='', color_name='blue-30')
 response_container = st.container()
 
@@ -62,22 +49,32 @@ def get_file(key):
 with input_container:
     user_input = get_file('presentation')
 
-# ## Applying the user context box
-# with context_container:
-#     user_context = get_file('context')
+def get_text(prompt):
+    input_text = st.text_area(prompt, "", key="input")
+    return input_text
+
+## Applying the user context box
+with context_container:
+    context_text = get_text('Input the problem statement: ')
 
 # Response output
 ## Function for taking user prompt as input followed by producing AI generated responses
-def generate_response(fileobj):
+def generate_response(fileobj, context_text):
     text = get_text_from_pdf(fileobj)
-    summary = custom_prompt_summary(text, PROMPT_TEMPLATE, chain_type='map_reduce')
-    return summary
+    summary = custom_prompt_summary(text, context_text, chain_type='map_reduce')
+    recommendation = get_recommendation(text, context_text, chain_type='map_reduce')
+    return summary, recommendation
 
 ## Conditional display of AI generated responses as a function of user provided prompts
 with response_container:
-    summary = ''
-
-    if user_input:
-        summary = generate_response(user_input)
+    if user_input and context_text:
+        summary, recommendation = generate_response(user_input, context_text)
+        output = f'''
+            Summary:
+                {summary}
+            
+            Recommendations:
+                {recommendation}
+        '''
         
-    message(summary)
+        message(output)

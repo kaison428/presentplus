@@ -8,11 +8,26 @@ import PyPDF2
 from langchain import OpenAI, PromptTemplate, LLMChain
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.chains.mapreduce import MapReduceChain
-from langchain.prompts import PromptTemplate
+from langchain.prompts import PromptTemplate, ChatPromptTemplate
+from langchain.chat_models import ChatOpenAI
 
 from langchain.docstore.document import Document
 
 from langchain.chains.summarize import load_summarize_chain
+
+from langchain.chains import RetrievalQA
+from langchain.indexes import VectorstoreIndexCreator
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.vectorstores import Chroma
+
+from langchain.chains.question_answering import load_qa_chain
+
+from langchain.schema import (
+    AIMessage,
+    HumanMessage,
+    SystemMessage
+)
 
 def get_text_from_pdf(fileobj):
 
@@ -31,21 +46,110 @@ def get_text_from_pdf(fileobj):
 
     return presentation_text
 
-def custom_prompt_summary(input, prompt_template, chain_type='map_reduce'):
-    PROMPT = PromptTemplate(template=prompt_template, input_variables=["text"])
 
+def custom_prompt_summary(input, context_text, chain_type='map_reduce'):
+
+    obj_delimiter = '###'
+    presentation_delimiter = '$$$'
+
+    # 1. specify model
     llm = OpenAI(temperature=0)
-    text_splitter = CharacterTextSplitter()
+    chat = ChatOpenAI(temperature=0.0)
 
+    # chain 1: summarize context and generate prompt
+    template_key_objectives = """Extract the key objectives from the text \
+        that is delimited by triple backticks \
+        and format them into a list. \
+        text: ```{text}```
+        """
+    
+    prompt_template = ChatPromptTemplate.from_template(template_key_objectives)
+    key_objectives_prompt = prompt_template.format_messages(
+                    text=context_text)
+    key_objectives = chat(key_objectives_prompt).content
+
+    # chain 2: create prompt for summarization
+    template_summary = """
+        Write a concise summary of the following presentation. The presentation is delimited by '$$$' below:\
+    
+            $$${text}$$$
+
+        """
+    template_summary += f"""
+        The summary should be relevant to the following objectives that are delimited by :\
+        
+            {obj_delimiter}{key_objectives}{obj_delimiter}
+
+        The summary should not repeat any of the above objectives and must orginate from the presentation.\
+        
+        """.format(context_text=key_objectives)
+    
+    print(template_summary)
+    
+    summary_prompt_template = PromptTemplate(template=template_summary, input_variables=["text"])
+
+    # chain 3: summarize input
+    text_splitter = CharacterTextSplitter()
     texts = text_splitter.split_text(input)
     docs = [Document(page_content=t) for t in texts[:3]]
 
-    chain = load_summarize_chain(llm, chain_type=chain_type)
-    summary = chain.run(docs)
-    chain = load_summarize_chain(OpenAI(temperature=0)
+    chain = load_summarize_chain(llm
                                 , chain_type=chain_type
-                                , map_prompt=PROMPT
-                                , combine_prompt=PROMPT)
+                                , map_prompt=summary_prompt_template
+                                , combine_prompt=summary_prompt_template)
     summary = chain.run(docs)
     
     return summary
+
+def get_recommendation(input, context_text, chain_type='map_reduce'):
+
+    # 1. specify model
+    llm = OpenAI(temperature=0)
+    chat = ChatOpenAI(temperature=0.0)
+
+    # chain 1: summarize context and generate prompt
+    template_key_objectives = """Extract the key and unique objectives from the text \
+        that is delimited by triple backticks \
+        and format them into a list. \
+        text: ```{text}```
+        """
+    
+    prompt_template = ChatPromptTemplate.from_template(template_key_objectives)
+    key_objectives_prompt = prompt_template.format_messages(
+                    text=context_text)
+    key_objectives = chat(key_objectives_prompt).content
+
+    # chain 2: create prompt for recommendation
+    system_message = """
+        You are a knowledgeable and friendly mentor for this presentation. You are to provide a concise and crticial recommendation to the presenter.\
+        
+        The presentation should meet the following key objectives:\
+    
+            {text}
+
+        The format of the recommendation should be as follows:\
+        
+            1. ...\
+            2. ...\
+            3. ...\
+
+        The recommendations should focus on the content, delivery and structure.\
+        """.format(text=key_objectives)
+    
+    human_message = f'''
+        What are your recommendations for the following presention?
+        
+        {input}
+
+    '''
+
+    messages = [
+        SystemMessage(
+            content=system_message
+        ),
+        HumanMessage(
+            content=human_message
+        ),
+    ]
+
+    return chat(messages).content
