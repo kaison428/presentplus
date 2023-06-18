@@ -9,26 +9,33 @@ from model import *
 import os
 os.environ['OPENAI_API_KEY'] = st.secrets['OPENAI_API_KEY']
 
-st.set_page_config(page_title="PresentPlus - An LLM-powered Presentation Mentor", page_icon=":star:")
+# Set session state
+
+def clear_submit():
+    st.session_state["submit"] = False
+
+st.set_page_config(page_title="PresentPlus - An LLM-powered Presentation Mentor", page_icon=":star:", layout='wide')
+st.header("PresentPlus - AI Mentor")
 
 # Sidebar contents
 with st.sidebar:
     st.title(':eye: PresentPlus')
     st.markdown('''
     ## About
-    This app is an LLM-powered presentation analyzer built using:
+    This app is an LLM-powered mentor built using:
     - [Streamlit](https://streamlit.io/)
     - [LangChain](https://python.langchain.com/en/latest/)
     
     ''')
 
     add_vertical_space(5)
-    st.write('Made by Kaison from HYPE AI :book:')
+    st.write('Made by HYPE AI :book:')
 
 # Layout of input/response containers
 input_container = st.container()
 context_container = st.container()
 colored_header(label='', description='', color_name='blue-30')
+button = st.button("Submit")
 response_container = st.container()
 
 # Flag
@@ -37,12 +44,7 @@ isPDF = False
 # User input
 ## Function for taking user provided PDF as input
 def get_file(key):
-    uploaded_file = st.file_uploader(f"Upload your {key} file", type='pdf', key=key)
-    if uploaded_file is None:
-        st.session_state["upload_state"] = False
-    else:
-        st.session_state["upload_state"] = True
-        
+    uploaded_file = st.file_uploader(f"Upload your {key} file", type='pdf', key=key, on_change=clear_submit)
     return uploaded_file
 
 ## Applying the user input box
@@ -50,12 +52,12 @@ with input_container:
     user_input = get_file('presentation')
 
 def get_text(prompt):
-    input_text = st.text_area(prompt, "", key="input")
+    input_text = st.text_area(prompt, "", key="input",  on_change=clear_submit)
     return input_text
 
 ## Applying the user context box
 with context_container:
-    context_text = get_text('Input the problem statement: ')
+    context_text = get_text('Type in the problem statement:')
 
 # Response output
 ## Function for taking user prompt as input followed by producing AI generated responses
@@ -67,14 +69,21 @@ def generate_response(fileobj, context_text):
 
 ## Conditional display of AI generated responses as a function of user provided prompts
 with response_container:
-    if user_input and context_text:
-        summary, recommendation = generate_response(user_input, context_text)
-        output = f'''
-            Summary:
-                {summary}
+    if button or st.session_state.get("submit"):
+        if not user_input:
+            st.error("Please upload a document!")
+        elif not context_text:
+            st.error("Please enter a question!")
+        else:
+            st.session_state["submit"] = True
             
-            Recommendations:
-                {recommendation}
-        '''
-        
-        message(output)
+            summary, recommendation = generate_response(user_input, context_text)
+            output = f'''
+                Summary:
+                    {summary}
+                
+                Recommendations:
+                    {recommendation}
+            '''
+            
+            message(output)
