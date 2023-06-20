@@ -18,8 +18,10 @@ from langchain.chains.summarize import load_summarize_chain
 from langchain.chains import RetrievalQA
 from langchain.indexes import VectorstoreIndexCreator
 from langchain.text_splitter import CharacterTextSplitter
+from langchain.vectorstores import DocArrayInMemorySearch
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import Chroma
+from langchain.document_loaders import TextLoader
 
 from langchain.chains.question_answering import load_qa_chain
 
@@ -53,8 +55,8 @@ def custom_prompt_summary(input, context_text, chain_type='map_reduce'):
     presentation_delimiter = '$$$'
 
     # 1. specify model
-    llm = OpenAI(temperature=0)
-    chat = ChatOpenAI(temperature=0.0)
+    llm = OpenAI(temperature=0.0, model_name="gpt-3.5-turbo")
+    chat = ChatOpenAI(temperature=0.0, model_name="gpt-3.5-turbo")
 
     # chain 1: summarize context and generate prompt
     template_key_objectives = """Extract the key objectives from the text \
@@ -91,7 +93,7 @@ def custom_prompt_summary(input, context_text, chain_type='map_reduce'):
     # chain 3: summarize input
     text_splitter = CharacterTextSplitter()
     texts = text_splitter.split_text(input)
-    docs = [Document(page_content=t) for t in texts[:3]]
+    docs = [Document(page_content=t) for t in texts[:]]
 
     chain = load_summarize_chain(llm
                                 , chain_type=chain_type
@@ -104,8 +106,8 @@ def custom_prompt_summary(input, context_text, chain_type='map_reduce'):
 def get_recommendation(input, context_text, chain_type='map_reduce'):
 
     # 1. specify model
-    llm = OpenAI(temperature=0)
-    chat = ChatOpenAI(temperature=0.0)
+    llm = OpenAI(temperature=0, model_name="gpt-3.5-turbo")
+    chat = ChatOpenAI(temperature=0.0, model_name="gpt-3.5-turbo")
 
     # chain 1: summarize context and generate prompt
     template_key_objectives = """Extract the key and unique objectives from the text \
@@ -153,3 +155,48 @@ def get_recommendation(input, context_text, chain_type='map_reduce'):
     ]
 
     return chat(messages).content
+
+def get_recommendation_from_vector(input, context_text, chain_type='map_reduce'):
+
+    # 1. specify model
+    llm = OpenAI(temperature=0, model_name="gpt-3.5-turbo")
+    chat = ChatOpenAI(temperature=0.0, model_name="gpt-3.5-turbo")
+
+    # chain 1: summarize context and generate prompt
+    template_key_objectives = """Extract the key and unique objectives from the text \
+        that is delimited by triple backticks \
+        and format them into a list. \
+        text: ```{text}```
+        """
+    
+    prompt_template = ChatPromptTemplate.from_template(template_key_objectives)
+    key_objectives_prompt = prompt_template.format_messages(
+                    text=context_text)
+    key_objectives = chat(key_objectives_prompt).content
+
+    # chain 2: create vector database of the presentation
+    text_splitter = CharacterTextSplitter()
+    texts = text_splitter.split_text(input)
+    docs = [Document(page_content=t) for t in texts[:]]
+
+    index = VectorstoreIndexCreator(
+        vectorstore_cls=DocArrayInMemorySearch
+    ).from_documents(docs)
+
+    query ='''
+        Please list recommendations for the presentation given the followstreing key objectives:\
+    
+            {text}
+
+        The format of the recommendation should be as follows:\
+        
+            1. ...\
+            2. ...\
+            3. ...\
+
+        The recommendations should focus on the content, delivery and structure.\
+    '''.format(text=key_objectives)
+
+    response = index.query(query)
+
+    return response

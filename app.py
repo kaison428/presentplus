@@ -14,12 +14,12 @@ os.environ['OPENAI_API_KEY'] = st.secrets['OPENAI_API_KEY']
 def clear_submit():
     st.session_state["submit"] = False
 
-st.set_page_config(page_title="PresentPlus - An LLM-powered Presentation Mentor", page_icon=":star:", layout='wide')
+st.set_page_config(page_title="PresentPlus - An LLM-powered Presentation Mentor", page_icon=":bulb:", layout='wide')
 st.header("PresentPlus - AI Mentor")
 
 # Sidebar contents
 with st.sidebar:
-    st.title(':eye: PresentPlus')
+    st.title(':bulb: PresentPlus')
     st.markdown('''
     ## About
     This app is an LLM-powered mentor built using:
@@ -57,7 +57,7 @@ def get_text(prompt):
 
 ## Applying the user context box
 with context_container:
-    context_text = get_text('Type in the problem statement:')
+    context_text = get_text('Type in the competition requirements:')
 
 # Response output
 ## Function for taking user prompt as input followed by producing AI generated responses
@@ -70,20 +70,23 @@ def generate_response(fileobj, context_text):
 ## Conditional display of AI generated responses as a function of user provided prompts
 with response_container:
     if button or st.session_state.get("submit"):
+
         if not user_input:
             st.error("Please upload a document!")
         elif not context_text:
             st.error("Please enter a question!")
         else:
             st.session_state["submit"] = True
-            
-            summary, recommendation = generate_response(user_input, context_text)
-            output = f'''
-                Summary:
-                    {summary}
-                
-                Recommendations:
-                    {recommendation}
-            '''
-            
+
+            with st.spinner('Wait for it...'):
+                summary, recommendation = generate_response(user_input, context_text)
+                output = f'''
+                    Summary:
+                        {summary}
+                    
+                    Recommendations:
+                        {recommendation}
+                '''
+            st.success('Done!')
+
             message(output)
