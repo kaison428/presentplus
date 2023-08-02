@@ -6,7 +6,6 @@ import PyPDF2
 
 # LangChain
 from langchain import OpenAI, PromptTemplate, LLMChain
-from langchain.text_splitter import CharacterTextSplitter
 from langchain.chains.mapreduce import MapReduceChain
 from langchain.prompts import PromptTemplate, ChatPromptTemplate
 from langchain.chat_models import ChatOpenAI
@@ -17,7 +16,7 @@ from langchain.chains.summarize import load_summarize_chain
 
 from langchain.chains import RetrievalQA
 from langchain.indexes import VectorstoreIndexCreator
-from langchain.text_splitter import CharacterTextSplitter
+from langchain.text_splitter import CharacterTextSplitter, RecursiveCharacterTextSplitter
 from langchain.vectorstores import DocArrayInMemorySearch
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import Chroma
@@ -25,12 +24,15 @@ from langchain.document_loaders import TextLoader
 
 from langchain.chains.question_answering import load_qa_chain
 
+
+# Scheme imports ------------------------------
 from langchain.schema import (
     AIMessage,
     HumanMessage,
     SystemMessage
 )
 
+# Utilities ------------------------------
 def get_text_from_pdf(fileobj):
 
     #create reader variable that will read the pdffileobj
@@ -48,15 +50,14 @@ def get_text_from_pdf(fileobj):
 
     return presentation_text
 
-
-def custom_prompt_summary(input, context_text, chain_type='map_reduce'):
+# Prompt functions --------------------------------
+def custom_prompt_summary(input, context_text, chain_type='map_reduce', model_name='gpt-3.5-turbo'):
 
     obj_delimiter = '###'
     presentation_delimiter = '$$$'
 
     # 1. specify model
-    llm = OpenAI(temperature=0.0, model_name="gpt-3.5-turbo")
-    chat = ChatOpenAI(temperature=0.0, model_name="gpt-3.5-turbo")
+    llm = ChatOpenAI(temperature=0.0, model_name=model_name)
 
     # chain 1: summarize context and generate prompt
     template_key_objectives = """Extract the key objectives from the text \
@@ -68,7 +69,7 @@ def custom_prompt_summary(input, context_text, chain_type='map_reduce'):
     prompt_template = ChatPromptTemplate.from_template(template_key_objectives)
     key_objectives_prompt = prompt_template.format_messages(
                     text=context_text)
-    key_objectives = chat(key_objectives_prompt).content
+    key_objectives = llm(key_objectives_prompt).content
 
     # chain 2: create prompt for summarization
     template_summary = """
@@ -84,30 +85,95 @@ def custom_prompt_summary(input, context_text, chain_type='map_reduce'):
 
         The summary should not repeat any of the above objectives and must orginate from the presentation.\
         
-        """.format(context_text=key_objectives)
-    
-    print(template_summary)
+        """
     
     summary_prompt_template = PromptTemplate(template=template_summary, input_variables=["text"])
 
     # chain 3: summarize input
-    text_splitter = CharacterTextSplitter()
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size = 1500,
+        chunk_overlap  = 300,
+        length_function = len,
+    )
+
     texts = text_splitter.split_text(input)
+    print([len(t) for t in texts])
     docs = [Document(page_content=t) for t in texts[:]]
 
     chain = load_summarize_chain(llm
                                 , chain_type=chain_type
                                 , map_prompt=summary_prompt_template
                                 , combine_prompt=summary_prompt_template)
+    
     summary = chain.run(docs)
     
     return summary
 
-def get_recommendation(input, context_text, chain_type='map_reduce'):
+def custom_prompt_summary_local(input, context_text, chain_type='map_reduce'):
+    pipe = pipeline(model="Salesforce/codet5-small")
+
+    prompt = '''
+        Summarize the following Python code:
+
+        # Prompt functions --------------------------------
+        def custom_prompt_summary(input, context_text, chain_type='map_reduce', model_name='gpt-3.5-turbo'):
+
+            obj_delimiter = '###'
+            presentation_delimiter = '$$$'
+
+            # 1. specify model
+            llm = ChatOpenAI(temperature=0.0, model_name=model_name)
+            
+            prompt_template = ChatPromptTemplate.from_template(template_key_objectives)
+            key_objectives_prompt = prompt_template.format_messages(
+                            text=context_text)
+            key_objectives = llm(key_objectives_prompt).content
+
+            # chain 2: create prompt for summarization
+            template_summary = """
+                Write a concise summary of the following presentation. The presentation is delimited by '$$$' below:\
+            
+                    $$${text}$$$
+
+                """
+            template_summary += f"""
+                The summary should be relevant to the following objectives that are delimited by :\
+                
+                    {obj_delimiter}{key_objectives}{obj_delimiter}
+
+                The summary should not repeat any of the above objectives and must orginate from the presentation.\
+                
+                """
+            
+            summary_prompt_template = PromptTemplate(template=template_summary, input_variables=["text"])
+
+            # chain 3: summarize input
+            text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size = 1500,
+                chunk_overlap  = 300,
+                length_function = len,
+            )
+
+            texts = text_splitter.split_text(input)
+            print([len(t) for t in texts])
+            docs = [Document(page_content=t) for t in texts[:]]
+
+            chain = load_summarize_chain(llm
+                                        , chain_type=chain_type
+                                        , map_prompt=summary_prompt_template
+                                        , combine_prompt=summary_prompt_template)
+            
+            summary = chain.run(docs)
+            
+            return summary
+    '''
+        
+    return pipe(prompt)
+
+def get_recommendation(input, context_text, chain_type='map_reduce', model_name='gpt-3.5-turbo'):
 
     # 1. specify model
-    llm = OpenAI(temperature=0, model_name="gpt-3.5-turbo")
-    chat = ChatOpenAI(temperature=0.0, model_name="gpt-3.5-turbo")
+    chat = ChatOpenAI(temperature=0.0, model_name=model_name)
 
     # chain 1: summarize context and generate prompt
     template_key_objectives = """Extract the key and unique objectives from the text \
@@ -122,12 +188,12 @@ def get_recommendation(input, context_text, chain_type='map_reduce'):
     key_objectives = chat(key_objectives_prompt).content
 
     # chain 2: create prompt for recommendation
-    system_message = """
+    system_message = f"""
         You are a knowledgeable and friendly mentor for this presentation. You are to provide a concise and crticial recommendation to the presenter.\
         
         The presentation should meet the following key objectives:\
     
-            {text}
+            {key_objectives}
 
         The format of the recommendation should be as follows:\
         
@@ -136,7 +202,9 @@ def get_recommendation(input, context_text, chain_type='map_reduce'):
             3. ...\
 
         The recommendations should focus on the content, delivery and structure.\
-        """.format(text=key_objectives)
+        """
+    
+    print(system_message)
     
     human_message = f'''
         What are your recommendations for the following presention?
@@ -156,11 +224,11 @@ def get_recommendation(input, context_text, chain_type='map_reduce'):
 
     return chat(messages).content
 
-def get_recommendation_from_vector(input, context_text, chain_type='map_reduce'):
+# ----------------------------- UNDER DEVELOPMENT! -----------------------------------
+def get_recommendation_from_vector(input, context_text, chain_type='map_reduce', model_name='gpt-3.5-turbo'):
 
     # 1. specify model
-    llm = OpenAI(temperature=0, model_name="gpt-3.5-turbo")
-    chat = ChatOpenAI(temperature=0.0, model_name="gpt-3.5-turbo")
+    chat = ChatOpenAI(temperature=0.0, model_name=model_name)
 
     # chain 1: summarize context and generate prompt
     template_key_objectives = """Extract the key and unique objectives from the text \

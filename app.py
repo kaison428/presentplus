@@ -9,12 +9,33 @@ from model import *
 import os
 os.environ['OPENAI_API_KEY'] = st.secrets['OPENAI_API_KEY']
 
-# Set session state
 
+# Set session state
 def clear_submit():
     st.session_state["submit"] = False
 
 st.set_page_config(page_title="PresentPlus - An LLM-powered Presentation Mentor", page_icon=":bulb:", layout='wide')
+# # Add custom CSS to hide the GitHub icon
+# hide_github_icon = """
+# #GithubIcon {
+#   visibility: hidden;
+# }
+# """
+# st.markdown(hide_github_icon, unsafe_allow_html=True)
+
+st.markdown(
+    """
+    <style>
+    .css-1jc7ptx, .e1ewe7hr3, .viewerBadge_container__1QSob,
+    .styles_viewerBadge__1yB5_, .viewerBadge_link__1S137,
+    .viewerBadge_text__1JaDK {
+        display: none;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 st.header("PresentPlus - AI Mentor")
 
 # Sidebar contents
@@ -62,9 +83,16 @@ with context_container:
 # Response output
 ## Function for taking user prompt as input followed by producing AI generated responses
 def generate_response(fileobj, context_text):
-    text = get_text_from_pdf(fileobj)
-    summary = custom_prompt_summary(text, context_text, chain_type='map_reduce')
-    recommendation = get_recommendation(text, context_text, chain_type='map_reduce')
+
+    # text = get_text_from_pdf(fileobj)
+
+    # text = get_text_from_pdf(fileobj)
+    # summary = custom_prompt_summary(text, context_text, chain_type='map_reduce')
+    # recommendation = get_recommendation(text, context_text, chain_type='map_reduce')
+
+    summary = ''
+    recommendation = custom_prompt_summary_local('','')
+    
     return summary, recommendation
 
 ## Conditional display of AI generated responses as a function of user provided prompts
